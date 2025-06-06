@@ -39,6 +39,11 @@ municipio["G"]="Q16854750"
 # a la hora de verificar si la consulta está bien y devuelve los
 # elementos correctos. Como mínimo se necesita el id Q????? y las
 # coordenadas.
+# 
+# IMPORTANTE: ajustar en la línea siguiente el tipo de elemento
+#             (para la consulta de arriba es "school")
+
+ELEMENTO=school
 
 # ***********************
 # Asignación de municipio
@@ -60,7 +65,7 @@ municipio["G"]="Q16854750"
 # se suben a Wikidata.
 
 
-wd sparql buscar.rq | jq -r '.[] | "\(.school.value), \(.coordinate)"' |
+wd sparql buscar.rq | jq -r ".[] | \"\(.$ELEMENTO.value), \(.coordinate)\"" |
 sed -r 's/^([0-9Q]+).*Point.([0-9\. -]+) ([0-9\. -]+).*/\1 \2 \3/g'|
 while read q long lat
 do
@@ -69,9 +74,12 @@ do
 
 	# esta es la consulta al geoserver de la intendencia
 
-	mun=$(curl -s "https://montevideo.gub.uy/app/geoserver/mapstore-tematicas/zon_v_sig_municipios/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=mapstore-tematicas:zon_v_sig_municipios&COUNT=1&SRSNAME=urn:ogc:def:crs:EPSG::32721&propertyName=municipio&BBOX=$lugar,$lugar,urn:ogc:def:crs:EPSG::32721" | grep mapstore.tematicas.municipio | sed -r 's/^.*>(.+)<.*/\1/g')
+	mun=$(cat wfs_query.txt | sed "s/_COORDINATES_/$lugar/g" | 
+	curl -s -X POST "https://montevideo.gub.uy/app/geoserver/mapstore-tematicas/zon_v_sig_municipios/wfs" \
+	-H "Content-Type: text/xml" \
+	--data @- | jq -r '.features[0].properties.municipio')
 
-	echo "$q $long $lat $mun"
+	echo "$q $long $lat $mun $immlong $immlat"
 	if test -n $mun -a -n ${municipio[$mun]}
 	then
 		# wikidata-cli "add claim"
